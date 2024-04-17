@@ -49,7 +49,7 @@ def afficherImages(chemins_images, start_index):
             image_pil = Image.open(chemins_images[i])
             image_pil = image_pil.resize((200, 200))
             image_tk = ImageTk.PhotoImage(image_pil)
-            
+
             label_image = tk.Label(root, image=image_tk)
             label_image.image = image_tk
             label_image.grid(row=(i - start_index) // 3, column=(i - start_index) % 3, padx=5, pady=5)
@@ -59,7 +59,7 @@ def afficherImages(chemins_images, start_index):
 
 def navigate_images(direction):
     global current_index
-    if direction == "suivant" and current_index + 6 < len(chemins_images):
+    if direction == "suivant" and current_index + 6 <len(chemins_images):
         current_index += 6
     elif direction == "précédent" and current_index - 6 >= 0:
         current_index -= 6
