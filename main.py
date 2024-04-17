@@ -25,6 +25,7 @@ def listeDateBrouillard(data):
 def getAllImage(nom_image,lst_images):#A partir d'une image de base, récupère toutes les images du même jour qui sont présente dans le répertoire
     jourAssocie = nom_image[22:30]
     print("jour associe = "+jourAssocie)
+    
     imagesAssociees = []
     for elem in lst_images:
 
