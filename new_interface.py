@@ -30,6 +30,9 @@ def charger_image(chemin, largeur, hauteur):
     return photo
 
 def afficher_images():
+    # Supprimer les images précédentes si elles existent
+    for label in frame.winfo_children():
+        label.destroy()
 
     # Supprimer les références aux images précédentes
     del images_chargees[:]
@@ -66,7 +69,7 @@ def afficher_images():
     # Afficher chaque image dans un label
     for i, fichier_image in enumerate(fichiers_images):
         chemin_image = os.path.join(dossier_images, fichier_image)
-        photo = charger_image(chemin_image, 300, 200)  # Redimensionnez l'image à la taille souhaitée
+        photo = charger_image(chemin_image, 250, 200)  # Redimensionnez l'image à la taille souhaitée
         images_chargees.append(photo)  # Garder une référence à l'image chargée
 
         # Créer un nouveau label pour l'image
@@ -107,8 +110,12 @@ canvas.pack(side="left", fill="both", expand=True)
 scrollbar = tk.Scrollbar(root, orient="vertical", command=canvas.yview)
 scrollbar.pack(side="right", fill="y")
 
+scrollbar2 = tk.Scrollbar(root, orient="horizontal", command=canvas.xview)
+scrollbar2.pack(side="top", fill="x")
+
 # Configurer le Canvas pour scroller avec la scrollbar
 canvas.configure(yscrollcommand=scrollbar.set)
+canvas.configure(xscrollcommand=scrollbar2.set)
 
 # Fonction pour actualiser la zone d'affichage lors du redimensionnement
 def actualiser_canvas(event):
