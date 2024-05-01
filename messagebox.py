@@ -1,22 +1,22 @@
 from tkinter import *
 
 # Fonctions qui permettent de modifier l'état de brouillard d'une image
-def switch_to_brouillard():
-    a = 4
-    print(a)
+def switch_to_brouillard(liste_images):
+    for elem in liste_images:
+        elem[1]= '1'
 
 
-def switch_to_not_brouillard():
-    b = 1
-    print(b)
+def switch_to_not_brouillard(liste_images):
+    for elem in liste_images:
+        elem[1] = '0'
 
 
-def switch_to_indetermine():
-    c = 5
-    print(c)
+def switch_to_indetermine(liste_images):
+    for elem in liste_images:
+        elem[1] = '-1'
 
 
-def create_message_box():
+def create_message_box(liste_images):
     # Création de la fenêtre de message
     message_win = Tk()
     message_win.minsize(300, 100)
@@ -26,9 +26,9 @@ def create_message_box():
     Label(message_win, text="Quel est l'état du brouillard ?").pack(padx=0, pady=1)
 
     # Création des boutons
-    bouton1 = Button(message_win, text='Brouillard', command=switch_to_brouillard)
-    bouton2 = Button(message_win, text='Pas de brouillard', command=switch_to_not_brouillard)
-    bouton3 = Button(message_win, text='Indeterminé', command=switch_to_indetermine)
+    bouton1 = Button(message_win, text='Brouillard', command=lambda: switch_to_brouillard(liste_images))
+    bouton2 = Button(message_win, text='Pas de brouillard', command=lambda: switch_to_not_brouillard(liste_images))
+    bouton3 = Button(message_win, text='Indeterminé', command=lambda: switch_to_indetermine(liste_images))
 
     label1 = Label(text="")
     label1.pack(padx=1, pady=1)
