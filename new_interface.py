@@ -71,13 +71,14 @@ def afficher_message(message):
 def afficher_graph(nom_image):
     chemin_image = os.path.abspath(os.path.join(os.path.dirname(nom_image), nom_image))
     if chemin_image:
+        if hasattr(afficher_graph, 'label_graphique'):
+            afficher_graph.label_graphique.destroy()
         graphique = Image.open(chemin_image)
         graph_redimensionne = graphique.resize((frame1.winfo_width(), frame1.winfo_height()), Image.Resampling.BICUBIC)
         graph_tk = ImageTk.PhotoImage(graph_redimensionne)
 
         # Détruire l'image précédente si elle existe
-        if hasattr(afficher_graph, 'label_graphique'):
-            afficher_graph.label_graphique.destroy()
+
 
         afficher_graph.label_graphique = Label(frame1, image=graph_tk)
         afficher_graph.label_graphique.image = graph_tk
