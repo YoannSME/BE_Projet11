@@ -295,6 +295,12 @@ def afficher_images(dossier_images, fichiers_images):
 def on_scroll(event):
     canvas.yview_scroll(-1 * (event.delta // 120), "units")
 
+def actualiser_canvas(event):
+    canvas.configure(scrollregion=canvas.bbox("all"))
+
+def show_context_menu(event):
+    context_menu.post(event.x_root, event.y_root)
+
 
 root = tk.Tk()
 root.minsize(1080, 720)
@@ -317,10 +323,6 @@ canvas.configure(yscrollcommand=scrollbar.set)
 canvas.configure(xscrollcommand=scrollbar2.set)
 
 
-def actualiser_canvas(event):
-    canvas.configure(scrollregion=canvas.bbox("all"))
-
-
 frame = tk.Frame(canvas)
 canvas.create_window((0, 0), window=frame, anchor="nw")
 frame.bind("<Configure>", actualiser_canvas)
@@ -337,11 +339,40 @@ file_menu.add_separator()
 file_menu.add_command(label="Afficher items", command=afficher_item_list)
 file_menu.add_separator()
 file_menu.add_command(label="Enregistrer", command=enregistrer_modifications)
+
+
 menu_bar.add_cascade(label="Fichier", menu=file_menu)
 
 edit_menu = Menu(menu_bar, tearoff=0)
-edit_menu.add_command(label="Sélectionner", command=lambda: create_message_box(images_a_modifier))
+edit_menu.add_command(label="Modifier brouillard", command=lambda: create_message_box(images_a_modifier))
 menu_bar.add_cascade(label="Editer", menu=edit_menu)
 
 root.config(menu=menu_bar)
+
+# Création du menu contextuel
+context_menu = Menu(root, tearoff=0)
+
+# Créer un sous-menu pour "Fichier"
+fichier_submenu = Menu(context_menu, tearoff=0)
+fichier_submenu.add_command(label="Charger un fichier", command=charger_csv)
+fichier_submenu.add_separator()
+fichier_submenu.add_command(label="Charger une image", command=charger_images_button)
+fichier_submenu.add_separator()
+fichier_submenu.add_command(label="Supprimer les images", command=supprimer_images)
+fichier_submenu.add_separator()
+fichier_submenu.add_command(label="Afficher items", command=afficher_item_list)
+fichier_submenu.add_separator()
+fichier_submenu.add_command(label="Enregistrer", command=enregistrer_modifications)
+context_menu.add_cascade(label="Fichier", menu=fichier_submenu)
+
+# Créer un sous-menu pour "Éditer"
+editer_submenu = Menu(context_menu, tearoff=0)
+editer_submenu.add_command(label="Modifier brouillard", command=lambda: create_message_box(images_a_modifier))
+context_menu.add_cascade(label="Éditer", menu=editer_submenu)
+
+# Liaison du clic droit pour afficher le menu contextuel sur le canvas et le frame
+canvas.bind("<Button-3>", show_context_menu)
+frame.bind("<Button-3>", show_context_menu)
+root.bind("<Button-3>", show_context_menu)
+
 root.mainloop()
