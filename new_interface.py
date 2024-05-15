@@ -5,6 +5,9 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 import pandas as pd
 import csv
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
+from datetime import datetime
 import re
 
 images_chargees = []
@@ -65,8 +68,8 @@ def afficher_message(message):
     messagebox.showinfo("Information", message)
 
 
-def afficher_graph():
-    chemin_image = filedialog.askopenfilename()
+def afficher_graph(nom_image):
+    chemin_image = os.path.abspath(os.path.join(os.path.dirname(nom_image), nom_image))
     if chemin_image:
         graphique = Image.open(chemin_image)
         graph_redimensionne = graphique.resize((frame1.winfo_width(), frame1.winfo_height()), Image.Resampling.BICUBIC)
@@ -75,6 +78,62 @@ def afficher_graph():
         label_graphique.image = graph_tk
         label_graphique.pack()
 
+
+def heure(date):
+    date = date.split(",")
+    time = date[1].split(":")[:2]
+    return ":".join(time)
+
+
+def formeLigne(valeur, couleur):
+    return plt.vlines(valeur, ymin=-1, ymax=1, color=couleur, linewidth=3)
+
+
+def creerGraphe(data, output_filename):
+    tabHeures = []
+    tabBrouillard = []
+    tabHeuresExact = []
+    nbLignes = data.shape[0]
+    date = data.iloc[0, 0]
+    date = date.split(",")
+    date = date[0]
+    plt.figure(figsize=(15, 6))
+    plt.xlabel(date)
+    for i in range(nbLignes):
+        h = datetime.strptime(heure(data.iloc[i, 0]), '%H:%M')
+        hstring = heure(data.iloc[i, 0])
+        minutes = h.minute
+        if int(minutes) == 0:
+            tabHeuresExact.append(hstring)
+        tabHeures.append(hstring)
+
+        indexFog = data.iloc[i, 1]
+        tabBrouillard.append(indexFog)
+
+    plt.plot(tabHeures, tabBrouillard, marker='o', color='black', linestyle='None')
+    for i, valeur in enumerate(tabBrouillard):
+        val_courante = tabHeures[i]
+        if valeur == 1:
+            formeLigne(val_courante, 'grey')
+        elif valeur == 0:
+            formeLigne(val_courante, 'blue')
+        elif valeur == -1:
+            formeLigne(val_courante, 'white')
+
+    plt.title('Cloud index - Pic du Midi')
+    legende_elements = [
+        Line2D([0], [0], color='gray', linewidth=3, label='cloud'),
+        Line2D([0], [0], color='blue', linewidth=3, label='no cloud'),
+        Line2D([0], [0], color='white', linewidth=3, label='no data')
+    ]
+    plt.legend(handles=legende_elements, loc='center left', bbox_to_anchor=(1, 0.5))
+    plt.yticks([])
+    plt.xticks(tabHeuresExact)
+    plt.ylim(-1, 1)
+    plt.grid(False)
+    plt.savefig(output_filename, format='jpg')
+    plt.close()
+    return afficher_graph(output_filename)
 
 def charger_image(chemin, largeur, hauteur):
     image = Image.open(chemin)
@@ -158,8 +217,10 @@ def charger_fichier_csv(fichier_csv):
     if fichier_csv is None:
         afficher_message("Le fichier CSV est manquant.")
         return
+
     repertoire = os.path.dirname(fichier_csv)
     data_csv = pd.read_csv(fichier_csv, sep=';', skiprows=29)
+    creerGraphe(data_csv, "graphe.jpg")
     liste_nom_images_donnees = liste_date_brouillard(data_csv)
     liste_im = [(elem[0], elem[1]) for elem in liste_nom_images_donnees]
     output_csv = fichier_csv
