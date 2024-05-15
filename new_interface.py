@@ -7,8 +7,8 @@ import pandas as pd
 import csv
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from datetime import datetime
 import re
+from datetime import datetime, timedelta
 
 images_chargees = []
 images_a_modifier = []
@@ -19,15 +19,15 @@ couleur = {'-1': 'white', '0': 'blue', '1': 'grey', '-1.0': 'white', '0.0': 'blu
 
 # Fog state modification functions
 def switch_to_brouillard(liste_images):
-    update_image_colors(liste_images, '1')
+    update_image_colors(liste_images, '1.0')
 
 
 def switch_to_not_brouillard(liste_images):
-    update_image_colors(liste_images, '0')
+    update_image_colors(liste_images, '0.0')
 
 
 def switch_to_indetermine(liste_images):
-    update_image_colors(liste_images, '-1')
+    update_image_colors(liste_images, '-1.0')
 
 
 def update_image_colors(liste_images, state):
@@ -74,9 +74,14 @@ def afficher_graph(nom_image):
         graphique = Image.open(chemin_image)
         graph_redimensionne = graphique.resize((frame1.winfo_width(), frame1.winfo_height()), Image.Resampling.BICUBIC)
         graph_tk = ImageTk.PhotoImage(graph_redimensionne)
-        label_graphique = Label(frame1, image=graph_tk)
-        label_graphique.image = graph_tk
-        label_graphique.pack()
+
+        # Détruire l'image précédente si elle existe
+        if hasattr(afficher_graph, 'label_graphique'):
+            afficher_graph.label_graphique.destroy()
+
+        afficher_graph.label_graphique = Label(frame1, image=graph_tk)
+        afficher_graph.label_graphique.image = graph_tk
+        afficher_graph.label_graphique.pack()
 
 
 def heure(date):
@@ -89,7 +94,74 @@ def formeLigne(valeur, couleur):
     return plt.vlines(valeur, ymin=-1, ymax=1, color=couleur, linewidth=3)
 
 
-def creerGraphe(data, output_filename):
+def create_base_csv(image_test):
+    # Extraire le répertoire de l'image_test
+    directory = os.path.dirname(image_test)
+
+    # Créer le nom du fichier CSV
+    nom_csv = "pdm_Webcam_L2a_CLOUDINDEX_" + os.path.basename(image_test)[22:30] + "_v01.csv"
+    print(f"Nom du fichier CSV : {nom_csv}")
+
+    # Chemin complet du fichier CSV dans le même répertoire que l'image_test
+    full_csv_path = os.path.join(directory, nom_csv)
+    print(f"Chemin complet du fichier CSV : {full_csv_path}")
+
+    horaire = mise_en_forme(os.path.basename(image_test))
+    date = horaire.split(',')[0]
+    entete = [
+        "# TITLE: Webcam - L2A - Cloud rate calculation",
+        "# FILE NAME: " + nom_csv,
+        "# DATA FORMAT: Version 1.0",
+        "# HEADER LINES: 30",
+        "# TOTAL LINES: 318",
+        "# DATA PRODUCT TYPE: L2A",
+        "# SOFTWARE VERSION: 2.7",
+        "# CAMERA MODEL: TRENDNET_IP313PI",
+        "# STATION CODE: PDM",
+        "# STATION NAME: Pic du Midi de Bigorre",
+        "# STATION CATEGORY: Contributing",
+        "# CONTRIBUTOR: Laboratoire d'aérologie (LAERO)",
+        "# COUNTRY/TERRITORY: France",
+        "# LATITUDE: 42.93701",
+        "# LONGITUDE: 0.141397",
+        "# ALTITUDE: 2877 m",
+        "# LOCATION: TDF",
+        "# CONTACT POINT: gilles.athier@aero.obs-mip.fr, francois.gheusi@aero.obs-mip.fr",
+        "# PARAMETER: Cloud_Index",
+        "# COVERING PERIOD: " + date + ",00:00:00 " + date + ",23:55:00",
+        "# TIME INTERVAL: 5 minutes",
+        "# DATA POLICY: P2OA (https://p2oa.aeris-data.fr/p2oa-data-policy)",
+        "# COMMENT:",
+        "#  - Times are UTC",
+        "#  - Cloud_Index are without unit",
+        "#    - missing_value: -1.0",
+        "#    - valid_min: 0.0 indicates no cloud",
+        "#    - valid_max: 1.0 indicates presence of cloud",
+        "#  - Data processing is described in",
+        "#DateTime;Cloud_Index"
+    ]
+
+    debut_images = horaire[:10] + ",00:00:00"
+    fin_images = horaire[:10] + ",23:55:00"
+    start_time = datetime.strptime(debut_images, "%d/%m/%Y,%H:%M:%S")
+    end_time = datetime.strptime(fin_images, "%d/%m/%Y,%H:%M:%S")
+
+    # Debug: Vérification si le répertoire existe et si le chemin est correct
+    if not os.path.exists(directory):
+        print(f"Erreur: le répertoire {directory} n'existe pas.")
+    if not os.access(directory, os.W_OK):
+        print(f"Erreur: le répertoire {directory} n'est pas accessible en écriture.")
+
+    with open(full_csv_path, mode='w', newline='', encoding='utf-8') as outfile:
+        for elem in entete:
+            outfile.write(elem + "\n")
+        current_time = start_time
+        while current_time <= end_time:
+            outfile.write(current_time.strftime("%d/%m/%Y,%H:%M:%S") + ";-1.0" + "\n")
+            current_time += timedelta(minutes=5)
+    return full_csv_path
+
+def creerGraphe(data, output_filename,output_dir):
     tabHeures = []
     tabBrouillard = []
     tabHeuresExact = []
@@ -131,9 +203,11 @@ def creerGraphe(data, output_filename):
     plt.xticks(tabHeuresExact)
     plt.ylim(-1, 1)
     plt.grid(False)
-    plt.savefig(output_filename, format='jpg')
+    output_path = os.path.join(os.path.abspath(output_dir),os.path.basename(output_filename)) #CREER FICHIER CSV VIDE AVEC ENTETE SI PAS DE CSV ASSOCIEES AU XIMAGES
+    print(output_path)
+    plt.savefig(output_path, format='jpg')
     plt.close()
-    return afficher_graph(output_filename)
+    return afficher_graph(output_path)
 
 def charger_image(chemin, largeur, hauteur):
     image = Image.open(chemin)
@@ -213,18 +287,24 @@ def charger_csv():
 
 
 def charger_fichier_csv(fichier_csv):
-    global output_csv
+    global output_csv,lst_images
+    lst_images.clear()
     if fichier_csv is None:
         afficher_message("Le fichier CSV est manquant.")
         return
 
     repertoire = os.path.dirname(fichier_csv)
     data_csv = pd.read_csv(fichier_csv, sep=';', skiprows=29)
-    creerGraphe(data_csv, "graphe.jpg")
+    nom_image = fichier_csv.replace(".csv", ".png")
+    creerGraphe(data_csv, nom_image,"Graphes")
     liste_nom_images_donnees = liste_date_brouillard(data_csv)
     liste_im = [(elem[0], elem[1]) for elem in liste_nom_images_donnees]
     output_csv = fichier_csv
+    loading_screen = show_loading_screen(root)
+    root.update_idletasks()  # Ensure the loading screen is shown
+
     afficher_images(repertoire, liste_im)
+    loading_screen.destroy()
 
 
 def supprimer_images():
@@ -233,7 +313,6 @@ def supprimer_images():
         label.destroy()
     images_chargees.clear()
     images_a_modifier.clear()
-    lst_images.clear()
     output_csv = None
 
 
@@ -247,7 +326,7 @@ def images_meme_jour(nom_image, lst_image):
     return [(elem, -1) for elem in lst_image if elem[22:30] == jour]
 
 
-def recuperer_csv_par_image(chemin_image, dossier_image, nom_image, fichiers_images):
+def recuperer_csv_par_image(dossier_image, nom_image, fichiers_images):
     date = nom_image[22:30]
     for fichier in fichiers_images:
         if fichier.endswith(".csv") and fichier[26:34] == date:
@@ -266,15 +345,15 @@ def charger_images_button():
     dossier_images = os.path.dirname(image_entree)
     fichiers_images = os.listdir(dossier_images)
 
-    fichier_csv = recuperer_csv_par_image(image_entree, dossier_images, nom_image, fichiers_images)
+    fichier_csv = recuperer_csv_par_image(dossier_images, nom_image, fichiers_images)
     if fichier_csv:
         charger_fichier_csv(fichier_csv)
     else:
         fichiers_images = images_meme_jour(nom_image, fichiers_images)
         if not fichiers_images:
             afficher_message("Il n'y a pas d'images dans le dossier spécifié.")
-            return
-        afficher_images(dossier_images, fichiers_images)
+        fichier_csv = create_base_csv(image_entree)
+        charger_fichier_csv(fichier_csv)
 
 
 def on_image_click(event, param):
@@ -297,16 +376,39 @@ def on_image_click(event, param):
 def show_loading_screen(root):
     loading_screen = Toplevel(root)
     loading_screen.title("Chargement")
-    loading_screen.geometry("200x100")
-    Label(loading_screen, text="Chargement en cours...").pack(expand=True)
+
+    # Dimensions de l'écran de chargement
+    width = 300
+    height = 150
+
+    # Dimensions de la fenêtre principale
+    root.update_idletasks()
+    x = (root.winfo_screenwidth() // 2) - (width // 2)-100
+    y = (root.winfo_screenheight() // 2) - (height // 2)-100
+
+    # Centrer l'écran de chargement
+    loading_screen.geometry(f"{width}x{height}+{x}+{y}")
+
+    # Créer un label centré
+    label = Label(loading_screen, text="Chargement en cours...", font=("Arial", 8))
+    label.pack(expand=True)
+
     return loading_screen
 
 
 def enregistrer_modifications():
     global output_csv,images_a_modifier,images_chargees
+
     if not output_csv:
         afficher_message("Aucun fichier CSV chargé.")
         return
+    if len(images_a_modifier)==0:
+        afficher_message("Aucune image sélectionnée.")
+        return
+    for elem in images_a_modifier:
+        if(elem[1] not in couleur.keys()):
+            afficher_message("Aucune modification effectuée sur la photo "+elem[0])
+            return
 
     loading_screen = show_loading_screen(root)
     root.update_idletasks()  # Ensure the loading screen is shown
@@ -352,7 +454,23 @@ def afficher_images(dossier_images, fichiers_images):
                     ligne_actuelle.pack(side="top", pady=5)
                     compteur_images = 0
 
+def tout_selectionner():
+    global images_a_modifier
+    images_a_modifier.clear()
+    for elem in lst_images:
+        label = elem[0]
+        param = elem[1]
+        try:
+            # Vérifier si l'attribut 'original_color' existe
+            label.original_color
+        except AttributeError:
+            # Si l'attribut n'existe pas, le définir
+            label.clicked = False
+            label.original_color = label.cget('highlightbackground')
 
+        label.clicked = True
+        label.config(highlightbackground='black', highlightthickness=4)
+        images_a_modifier.append([param, label.original_color])
 def on_scroll(event):
     canvas.yview_scroll(-1 * (event.delta // 120), "units")
 
@@ -395,6 +513,8 @@ file_menu.add_command(label="Charger un fichier", command=charger_csv)
 file_menu.add_separator()
 file_menu.add_command(label="Charger une image", command=charger_images_button)
 file_menu.add_separator()
+file_menu.add_command(label="Tout sélectionner",command=tout_selectionner)
+file_menu.add_separator()
 file_menu.add_command(label="Supprimer les images", command=supprimer_images)
 file_menu.add_separator()
 file_menu.add_command(label="Afficher items", command=afficher_item_list)
@@ -418,6 +538,8 @@ fichier_submenu = Menu(context_menu, tearoff=0)
 fichier_submenu.add_command(label="Charger un fichier", command=charger_csv)
 fichier_submenu.add_separator()
 fichier_submenu.add_command(label="Charger une image", command=charger_images_button)
+fichier_submenu.add_separator()
+fichier_submenu.add_command(label="Tout sélectionner",command=tout_selectionner)
 fichier_submenu.add_separator()
 fichier_submenu.add_command(label="Supprimer les images", command=supprimer_images)
 fichier_submenu.add_separator()
