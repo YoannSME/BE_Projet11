@@ -21,25 +21,26 @@ couleur = {'-1': 'white', '0': 'blue', '1': 'grey', '-1.0': 'white', '0.0': 'blu
 def switch_to_brouillard(liste_images):
     update_image_colors(liste_images, '1.0')
 
-
 def switch_to_not_brouillard(liste_images):
     update_image_colors(liste_images, '0.0')
-
 
 def switch_to_indetermine(liste_images):
     update_image_colors(liste_images, '-1.0')
 
-
 def update_image_colors(liste_images, state):
+    if(len(images_a_modifier) == 0):
+        afficher_message("Aucune image sélectionnée")
+        return
     global couleur, lst_images
-    for elem in liste_images:
-        elem[1] = state
+    for chaque_image in liste_images:
+        chaque_image[1] = state
         for image in lst_images:
-            if elem[0] == image[1]:
+            if chaque_image[0] == image[1]:
                 try:
                     image[0].config(highlightbackground=couleur[state], highlightthickness=4)
                 except TclError:
                     pass  # The widget no longer exists
+
 
 
 def create_message_box(liste_images):
@@ -69,16 +70,14 @@ def afficher_message(message):
 
 
 def afficher_graph(nom_image):
+    global frame1
     chemin_image = os.path.abspath(os.path.join(os.path.dirname(nom_image), nom_image))
     if chemin_image:
         if hasattr(afficher_graph, 'label_graphique'):
             afficher_graph.label_graphique.destroy()
         graphique = Image.open(chemin_image)
-        graph_redimensionne = graphique.resize((frame1.winfo_width(), frame1.winfo_height()), Image.Resampling.BICUBIC)
+        graph_redimensionne = graphique.resize((frame1.winfo_width()+50, frame1.winfo_height()-50), Image.Resampling.BICUBIC)
         graph_tk = ImageTk.PhotoImage(graph_redimensionne)
-
-        # Détruire l'image précédente si elle existe
-
 
         afficher_graph.label_graphique = Label(frame1, image=graph_tk)
         afficher_graph.label_graphique.image = graph_tk
@@ -94,18 +93,15 @@ def heure(date):
 def formeLigne(valeur, couleur):
     return plt.vlines(valeur, ymin=-1, ymax=1, color=couleur, linewidth=3)
 
-
 def create_base_csv(image_test):
-    # Extraire le répertoire de l'image_test
+    # Extraire le répertoire courant de l'image_test
     directory = os.path.dirname(image_test)
 
     # Créer le nom du fichier CSV
     nom_csv = "pdm_Webcam_L2a_CLOUDINDEX_" + os.path.basename(image_test)[22:30] + "_v01.csv"
-    print(f"Nom du fichier CSV : {nom_csv}")
 
     # Chemin complet du fichier CSV dans le même répertoire que l'image_test
     full_csv_path = os.path.join(directory, nom_csv)
-    print(f"Chemin complet du fichier CSV : {full_csv_path}")
 
     horaire = mise_en_forme(os.path.basename(image_test))
     date = horaire.split(',')[0]
@@ -149,9 +145,11 @@ def create_base_csv(image_test):
 
     # Debug: Vérification si le répertoire existe et si le chemin est correct
     if not os.path.exists(directory):
-        print(f"Erreur: le répertoire {directory} n'existe pas.")
+        afficher_message(f"Erreur: le répertoire {directory} n'existe pas.")
+        return
     if not os.access(directory, os.W_OK):
-        print(f"Erreur: le répertoire {directory} n'est pas accessible en écriture.")
+        afficher_message(f"Erreur: le répertoire {directory} n'est pas accessible en écriture.")
+        return
 
     with open(full_csv_path, mode='w', newline='', encoding='utf-8') as outfile:
         for elem in entete:
@@ -231,7 +229,7 @@ def copier_fichier(input_csv):
     global images_a_modifier, output_csv
     modif_effectuees = [[mise_en_forme(chaque_image[0]), chaque_image[1]] for chaque_image in images_a_modifier]
 
-    # Extract version number from filename
+    # Expression réguliere pour récupérer version du nom du fichier csv
     match = re.search(r"_v(\d+)", input_csv)
     if match:
         version = int(match.group(1)) + 1
@@ -248,6 +246,15 @@ def copier_fichier(input_csv):
         writer = csv.writer(outfile, delimiter=';', quoting=csv.QUOTE_NONE, escapechar='\\')
 
         for row in reader:
+            if "Version" in row[0]:
+                # Expression réguliere pour récupérer version du csv dans le csv
+                version_match = re.search(r"Version (\d+)", row[0])
+                if version_match:
+                    current_version = int(version_match.group(1))
+                    new_version_str = f"Version {current_version + 1}"
+                    row[0] = re.sub(r"Version \d+", new_version_str, row[0])
+                    writer.writerow(row)
+                    continue
             for i, modif in enumerate(modif_effectuees):
                 nom_image, data_image = modif
                 if nom_image == row[0]:
@@ -281,7 +288,7 @@ def liste_date_brouillard(data):
 
 def charger_csv():
     file = filedialog.askopenfilename()
-    if file:
+    if file and file.endswith('.csv'):
         charger_fichier_csv(file)
     else:
         afficher_message("Aucun fichier sélectionné.")
@@ -297,7 +304,7 @@ def charger_fichier_csv(fichier_csv):
     repertoire = os.path.dirname(fichier_csv)
     data_csv = pd.read_csv(fichier_csv, sep=';', skiprows=29)
     nom_image = fichier_csv.replace(".csv", ".png")
-    creerGraphe(data_csv, nom_image,"Graphes")
+    creerGraphe(data_csv, nom_image,"graphiques")
     liste_nom_images_donnees = liste_date_brouillard(data_csv)
     liste_im = [(elem[0], elem[1]) for elem in liste_nom_images_donnees]
     output_csv = fichier_csv
@@ -338,7 +345,7 @@ def recuperer_csv_par_image(dossier_image, nom_image, fichiers_images):
 def charger_images_button():
     supprimer_images()
     image_entree = filedialog.askopenfilename()
-    if not image_entree:
+    if not image_entree or not image_entree.endswith('jpg'):
         afficher_message("Aucune image sélectionnée.")
         return
 
@@ -372,6 +379,7 @@ def on_image_click(event, param):
         images_a_modifier = [elem for elem in images_a_modifier if elem[0] != param]
         label.config(highlightbackground=label.original_color, highlightthickness=4)
         label.clicked = False
+    check_all_selected()
 
 
 def show_loading_screen(root):
@@ -421,9 +429,6 @@ def enregistrer_modifications():
     afficher_message(f"Fin du chargement ! nouveau fichier.csv : {os.path.basename(new_csv)}")
 
 
-def afficher_item_list():
-    for elem in images_a_modifier:
-        print(elem)
 
 
 def afficher_images(dossier_images, fichiers_images):
@@ -448,30 +453,39 @@ def afficher_images(dossier_images, fichiers_images):
                 label_image.image = photo
                 label_image.pack(side="left", padx=2, pady=2)
                 label_image.bind("<Button-1>", lambda event, arg=image_etudiee: on_image_click(event, arg))
+                label_image.clicked = False
+                label_image.original_color = color
                 lst_images.append((label_image, image_etudiee))
                 compteur_images += 1
                 if compteur_images == 5:
                     ligne_actuelle = Frame(frame)
                     ligne_actuelle.pack(side="top", pady=5)
                     compteur_images = 0
+def check_all_selected():
+    if len(images_a_modifier) == len(lst_images):
+        selection_label.config(text="Toutes les images sont sélectionnées", fg="green")
+    elif len(images_a_modifier) == 0:
+        selection_label.config(text="Aucune image sélectionnée", fg="red")
+    else:
+        selection_label.config(text=f"{len(images_a_modifier)} images sélectionnées", fg="orange")
 
 def tout_selectionner():
     global images_a_modifier
     images_a_modifier.clear()
-    for elem in lst_images:
-        label = elem[0]
-        param = elem[1]
-        try:
-            # Vérifier si l'attribut 'original_color' existe
-            label.original_color
-        except AttributeError:
-            # Si l'attribut n'existe pas, le définir
-            label.clicked = False
-            label.original_color = label.cget('highlightbackground')
-
+    for label,param in lst_images:
         label.clicked = True
-        label.config(highlightbackground='black', highlightthickness=4)
+        label.config(highlightbackground='red', highlightthickness=4)
         images_a_modifier.append([param, label.original_color])
+        check_all_selected()
+
+def tout_de_selectionner():
+    global images_a_modifier
+    images_a_modifier.clear()
+    for label,param in lst_images:
+        label.clicked = False
+        label.config(highlightbackground=label.original_color, highlightthickness=4)
+        check_all_selected()
+
 def on_scroll(event):
     canvas.yview_scroll(-1 * (event.delta // 120), "units")
 
@@ -487,8 +501,12 @@ root.minsize(1080, 720)
 root.title("MidiFog")
 root.iconbitmap("../BE_Projet11/montagne_icon.ico")
 
+selection_label = tk.Label(root, text="Aucune image sélectionnée", fg="black")
+selection_label.pack(anchor="nw", padx=10, pady=5)
+
 frame1 = Frame(root, bd=2, relief=GROOVE)
 frame1.pack(fill=BOTH, expand=True)
+
 
 canvas = tk.Canvas(root)
 canvas.pack(side="left", fill="both", expand=True)
@@ -516,9 +534,9 @@ file_menu.add_command(label="Charger une image", command=charger_images_button)
 file_menu.add_separator()
 file_menu.add_command(label="Tout sélectionner",command=tout_selectionner)
 file_menu.add_separator()
-file_menu.add_command(label="Supprimer les images", command=supprimer_images)
+file_menu.add_command(label="Tout désélectionner",command=tout_de_selectionner)
 file_menu.add_separator()
-file_menu.add_command(label="Afficher items", command=afficher_item_list)
+file_menu.add_command(label="Supprimer les images", command=supprimer_images)
 file_menu.add_separator()
 file_menu.add_command(label="Enregistrer", command=enregistrer_modifications)
 
@@ -542,12 +560,13 @@ fichier_submenu.add_command(label="Charger une image", command=charger_images_bu
 fichier_submenu.add_separator()
 fichier_submenu.add_command(label="Tout sélectionner",command=tout_selectionner)
 fichier_submenu.add_separator()
-fichier_submenu.add_command(label="Supprimer les images", command=supprimer_images)
+fichier_submenu.add_command(label="Tout désélectionner",command=tout_de_selectionner)
 fichier_submenu.add_separator()
-fichier_submenu.add_command(label="Afficher items", command=afficher_item_list)
+fichier_submenu.add_command(label="Supprimer les images", command=supprimer_images)
 fichier_submenu.add_separator()
 fichier_submenu.add_command(label="Enregistrer", command=enregistrer_modifications)
 context_menu.add_cascade(label="Fichier", menu=fichier_submenu)
+
 
 # Créer un sous-menu pour "Éditer"
 editer_submenu = Menu(context_menu, tearoff=0)
