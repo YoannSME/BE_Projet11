@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 
 images_chargees = []
 images_a_modifier = []
+images_a_enregistrer = set()
 lst_images = []
 output_csv = None
 couleur = {'-1': 'white', '0': 'blue', '1': 'grey', '-1.0': 'white', '0.0': 'blue', '1.0': 'grey'}
@@ -28,18 +29,22 @@ def switch_to_indetermine(liste_images):
     update_image_colors(liste_images, '-1.0')
 
 def update_image_colors(liste_images, state):
-    if(len(images_a_modifier) == 0):
+    global couleur, lst_images, images_a_enregistrer
+    if(len(images_a_enregistrer) == 0):
         afficher_message("Aucune image sélectionnée")
         return
-    global couleur, lst_images
     for chaque_image in liste_images:
         chaque_image[1] = state
         for image in lst_images:
             if chaque_image[0] == image[1]:
+                add_to_ens((chaque_image[0], state),images_a_enregistrer)
                 try:
                     image[0].config(highlightbackground=couleur[state], highlightthickness=4)
+                    image[0].clicked = False
                 except TclError:
                     pass  # The widget no longer exists
+    images_a_modifier.clear()
+
 
 
 
@@ -226,8 +231,8 @@ def mise_en_forme(image_test):
 
 
 def copier_fichier(input_csv):
-    global images_a_modifier, output_csv
-    modif_effectuees = [[mise_en_forme(chaque_image[0]), chaque_image[1]] for chaque_image in images_a_modifier]
+    global images_a_modifier, output_csv,images_a_enregistrer
+    modif_effectuees = [[mise_en_forme(chaque_image[0]), chaque_image[1]] for chaque_image in images_a_enregistrer]
 
     # Expression réguliere pour récupérer version du nom du fichier csv
     match = re.search(r"_v(\d+)", input_csv)
@@ -263,6 +268,7 @@ def copier_fichier(input_csv):
                     break
             writer.writerow(row)
     images_a_modifier = []
+    images_a_enregistrer.clear()
     return output_csv
 
 
@@ -296,6 +302,7 @@ def charger_csv():
 
 def charger_fichier_csv(fichier_csv):
     global output_csv,lst_images
+    supprimer_images()
     lst_images.clear()
     if fichier_csv is None:
         afficher_message("Le fichier CSV est manquant.")
@@ -305,6 +312,7 @@ def charger_fichier_csv(fichier_csv):
     data_csv = pd.read_csv(fichier_csv, sep=';', skiprows=29)
     nom_image = fichier_csv.replace(".csv", ".png")
     creerGraphe(data_csv, nom_image,"graphiques")
+    check_all_selected()
     liste_nom_images_donnees = liste_date_brouillard(data_csv)
     liste_im = [(elem[0], elem[1]) for elem in liste_nom_images_donnees]
     output_csv = fichier_csv
@@ -312,7 +320,9 @@ def charger_fichier_csv(fichier_csv):
     root.update_idletasks()  # Ensure the loading screen is shown
 
     afficher_images(repertoire, liste_im)
+
     loading_screen.destroy()
+
 
 
 def supprimer_images():
@@ -321,6 +331,10 @@ def supprimer_images():
         label.destroy()
     images_chargees.clear()
     images_a_modifier.clear()
+    images_a_enregistrer.clear()
+    if hasattr(afficher_graph, 'label_graphique'):
+        afficher_graph.label_graphique.destroy()
+        del afficher_graph.label_graphique
     output_csv = None
 
 
@@ -336,10 +350,15 @@ def images_meme_jour(nom_image, lst_image):
 
 def recuperer_csv_par_image(dossier_image, nom_image, fichiers_images):
     date = nom_image[22:30]
+    liste_fichiers_csv = []
     for fichier in fichiers_images:
         if fichier.endswith(".csv") and fichier[26:34] == date:
-            return os.path.join(dossier_image, fichier)
-    return None
+            liste_fichiers_csv.append(fichier)
+
+    if len(liste_fichiers_csv) == 0:
+        return None
+    return os.path.join(dossier_image, liste_fichiers_csv[-1])
+
 
 
 def charger_images_button():
@@ -363,9 +382,27 @@ def charger_images_button():
         fichier_csv = create_base_csv(image_entree)
         charger_fichier_csv(fichier_csv)
 
+def add_to_ens(val,ens):
+    chemin_image = val[0]
+    print("j'ajoute",chemin_image,val[1])
+    for elem in ens:
+        if chemin_image == elem[0]:
+            ens.remove(elem)
+            ens.add(val)
+            return ens
+    return ens.add(val)
+
+def remove_from_ens(val,ens):
+    chemin_image = val[0]
+    print("je retire", chemin_image, val[1])
+    for elem in ens:
+        if chemin_image == elem[0]:
+            ens.remove(elem)
+            return ens
+    return ens
 
 def on_image_click(event, param):
-    global images_a_modifier
+    global images_a_modifier,images_a_enregistrer
     label = event.widget
     if not hasattr(label, 'clicked'):
         label.clicked = False
@@ -373,10 +410,12 @@ def on_image_click(event, param):
 
     if not label.clicked:
         images_a_modifier.append([param, label.original_color])
+        add_to_ens((param,label.original_color),images_a_enregistrer)
         label.config(highlightbackground='red', highlightthickness=4)
         label.clicked = True
     else:
         images_a_modifier = [elem for elem in images_a_modifier if elem[0] != param]
+        remove_from_ens((param,0),images_a_enregistrer)
         label.config(highlightbackground=label.original_color, highlightthickness=4)
         label.clicked = False
     check_all_selected()
@@ -411,10 +450,10 @@ def enregistrer_modifications():
     if not output_csv:
         afficher_message("Aucun fichier CSV chargé.")
         return
-    if len(images_a_modifier)==0:
+    if len(images_a_enregistrer)==0:
         afficher_message("Aucune image sélectionnée.")
         return
-    for elem in images_a_modifier:
+    for elem in images_a_enregistrer:
         if(elem[1] not in couleur.keys()):
             afficher_message("Aucune modification effectuée sur la photo "+elem[0])
             return
@@ -462,25 +501,28 @@ def afficher_images(dossier_images, fichiers_images):
                     ligne_actuelle.pack(side="top", pady=5)
                     compteur_images = 0
 def check_all_selected():
-    if len(images_a_modifier) == len(lst_images):
-        selection_label.config(text="Toutes les images sont sélectionnées", fg="green")
-    elif len(images_a_modifier) == 0:
+    if len(images_a_enregistrer)==0 or len(images_a_modifier)== 0:
         selection_label.config(text="Aucune image sélectionnée", fg="red")
+    elif len(images_a_enregistrer) == len(lst_images):
+        selection_label.config(text="Toutes les images sont sélectionnées", fg="green")
     else:
-        selection_label.config(text=f"{len(images_a_modifier)} images sélectionnées", fg="orange")
+        selection_label.config(text=f"{len(images_a_enregistrer)} images sélectionnées", fg="orange")
 
 def tout_selectionner():
-    global images_a_modifier
+    global images_a_modifier,images_a_enregistrer
     images_a_modifier.clear()
+    images_a_enregistrer.clear()
     for label,param in lst_images:
         label.clicked = True
         label.config(highlightbackground='red', highlightthickness=4)
-        images_a_modifier.append([param, label.original_color])
+        images_a_modifier.append([param,label.original_color])
+        add_to_ens((param, label.original_color),images_a_enregistrer)
         check_all_selected()
 
 def tout_de_selectionner():
-    global images_a_modifier
+    global images_a_modifier,images_a_enregistrer
     images_a_modifier.clear()
+    images_a_enregistrer.clear()
     for label,param in lst_images:
         label.clicked = False
         label.config(highlightbackground=label.original_color, highlightthickness=4)
