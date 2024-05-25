@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 import re
 from datetime import datetime, timedelta
+import yaml
 
 
 #Variables globales pour la gestion des images
@@ -21,6 +22,18 @@ output_csv = None
 #Dictionnaire d'association Donnée-Couleur
 couleur = {'-1': 'white', '0': 'blue', '1': 'grey', '-1.0': 'white', '0.0': 'blue', '1.0': 'grey'}
 
+
+
+def charger_configuration(yaml_file):
+    with open(yaml_file, 'r') as file:
+        config = yaml.safe_load(file)
+    return config
+
+# Charger la configuration
+config = charger_configuration('config.yml')
+# Extraire les chemins des répertoires
+chemin_graphiques = config['directories']['graphiques']
+chemin_icones = config['directories']['icones']
 
 # Fonctions permettant de modifier la valeur associée au brouillard
 def switch_to_brouillard(liste_images):
@@ -324,7 +337,7 @@ def charger_fichier_csv(fichier_csv):
     repertoire = os.path.dirname(fichier_csv)
     data_csv = pd.read_csv(fichier_csv, sep=';', skiprows=29)
     nom_image = fichier_csv.replace(".csv", ".png")
-    creerGraphe(data_csv, nom_image,"graphiques")
+    creerGraphe(data_csv, nom_image,chemin_graphiques)
     check_all_selected()
     liste_nom_images_donnees = liste_date_brouillard(data_csv)
     liste_im = [(elem[0], elem[1]) for elem in liste_nom_images_donnees]
@@ -564,7 +577,7 @@ def show_context_menu(event):
 root = tk.Tk()
 root.minsize(1080, 720)
 root.title("MidiFog")
-root.iconbitmap("Icones/montagne_icon.ico")
+root.iconbitmap(os.path.join(chemin_icones,"montagne_icon.ico"))
 
 selection_label = tk.Label(root, text="Aucune image sélectionnée", fg="black")
 selection_label.pack(anchor="nw", padx=10, pady=5)

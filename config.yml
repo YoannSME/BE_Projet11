@@ -1,0 +1,17 @@
+# Configuration des répertoires d'enregistrement
+directories:
+  graphiques: C:\Users\isaac\OneDrive\Bureau\testGraph
+  icones: C:\Users\isaac\OneDrive\Bureau\L3\BE\BE_Projet11\Icones
+
+# Autres configurations de l'application
+app:
+  name: MidiFog
+  version: 1.0.0
+  environment: production
+
+
+# Paramètres divers
+settings:
+  logging:
+    level: info
+    file: /var/log/midifog.log
